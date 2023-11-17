@@ -225,7 +225,7 @@ class PrefectV2 extends TerraformStack {
 
     const agentPolicies = new AgentIamPolicies(
       this,
-      `agentPolicies${DeploymentTypeProper}`,
+      `workerPolicies${DeploymentTypeProper}`,
       this.prefectV2Secret,
       prefix,
       this.caller,
@@ -235,7 +235,7 @@ class PrefectV2 extends TerraformStack {
     // create the ECS Service for the Prefect v2 agent
     new PocketECSApplication(this, prefix, {
       prefix: prefix,
-      shortName: `PFCTV2${deploymentType.toUpperCase()}`,
+      shortName: `PFCTWKR${deploymentType.toUpperCase()}`,
       taskSize: {
         cpu: config.agentCpu,
         memory: config.agentMemory
