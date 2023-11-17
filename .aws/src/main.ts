@@ -27,6 +27,7 @@ class PrefectV2 extends TerraformStack {
   private readonly region: DataAwsRegion;
   private readonly caller: DataAwsCallerIdentity;
   private readonly prefectV2Secret: DataAwsSecretsmanagerSecret;
+  private readonly dockerSharedSecret: DataAwsSecretsmanagerSecret;
 
   constructor(scope: Construct, id: string) {
     super(scope, id);
@@ -49,7 +50,14 @@ class PrefectV2 extends TerraformStack {
         name: `dpt/${config.tags.environment}/prefect_v2`
       }
     );
-
+    // need this for docker hub pull
+    this.dockerSharedSecret = new DataAwsSecretsmanagerSecret(
+      this,
+      'dockerSharedSecret',
+      {
+        name: 'Shared/DockerHub'
+      }
+    );
     // need this to support article text flow
     const pocketDataItemBucket = new DataAwsS3Bucket(
       this,
@@ -170,6 +178,7 @@ class PrefectV2 extends TerraformStack {
       this,
       `agentPolicies${DeploymentTypeProper}`,
       this.prefectV2Secret,
+      this.dockerSharedSecret,
       prefix,
       this.caller,
       this.region
@@ -227,6 +236,7 @@ class PrefectV2 extends TerraformStack {
       this,
       `workerPolicies${DeploymentTypeProper}`,
       this.prefectV2Secret,
+      this.dockerSharedSecret,
       prefix,
       this.caller,
       this.region
@@ -244,7 +254,7 @@ class PrefectV2 extends TerraformStack {
         {
           name: `prefect-v2-worker`,
           containerImage: 'prefecthq/prefect:2-latest',
-          repositoryCredentialsParam: `arn:aws:secretsmanager:${this.region.name}:${this.caller.accountId}:secret:Shared/DockerHub`,
+          repositoryCredentialsParam: this.dockerSharedSecret.arn,
           command: [
             '/bin/sh',
             '-c',
