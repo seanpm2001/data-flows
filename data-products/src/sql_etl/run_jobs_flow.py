@@ -4,7 +4,11 @@ from pathlib import Path
 
 import pendulum as pdm
 from common import get_script_path
-from common.databases.snowflake_utils import SfGcsStage, get_gcs_stage
+from common.databases.snowflake_utils import (
+    SfGcsStage,
+    SnowflakeGcsStageSettings,
+    get_gcs_stage,
+)
 from common.deployment import FlowDeployment, FlowEnvar, FlowSpec
 from common.settings import CommonSettings
 from prefect import flow, get_run_logger
@@ -19,6 +23,14 @@ from shared.utils import (
 )
 
 CS = CommonSettings()  # type: ignore
+
+# helper for passing stage id to deployment parameters
+SF_GCP_STAGE_ID = CS.deployment_type_value(
+    dev="default", staging="default", main="gcs_pocket_shared"
+)
+
+SF_GCS_STAGE_DATA = SnowflakeGcsStageSettings()  # type: ignore
+
 
 # template sql to get the latest stored offset for etl job
 LAST_OFFSET_SQL = """{% set sql_engine = "snowflake" %}
@@ -115,7 +127,9 @@ class SqlEtlJob(SqlJob):
         Returns:
             SfGcsStage: Model for stage metadata.
         """
-        return get_gcs_stage(self.snowflake_stage_id)
+        return get_gcs_stage(
+            SF_GCS_STAGE_DATA.snowflake_gcp_stage_data, self.snowflake_stage_id
+        )
 
     def get_gcs_uri(self, interval_input: IntervalSet) -> str:
         """Get the Gcp storage uri based on interval metadata.
@@ -421,32 +435,9 @@ async def main(etl_input: SqlEtlJob):
     await process_all()
 
 
-# helper for passing stage id to deployment parameters
-SF_GCP_STAGE_ID = CS.deployment_type_value(
-    dev="default", staging="default", main="gcs_pocket_shared"
-)
-
 FLOW_SPEC = FlowSpec(
     flow=main,
     docker_env="base",
-    secrets=[
-        FlowEnvar(
-            envar_name="DF_CONFIG_SNOWFLAKE_CREDENTIALS",
-            envar_value=f"data-flows/{CS.deployment_type}/snowflake-credentials",
-        ),
-        FlowEnvar(
-            envar_name="DF_CONFIG_GCP_CREDENTIALS",
-            envar_value=f"data-flows/{CS.deployment_type}/gcp-credentials",
-        ),
-        FlowEnvar(
-            envar_name="DF_CONFIG_SNOWFLAKE_GCP_STAGES",
-            envar_value=f"data-flows/{CS.deployment_type}/snowflake-gcp-stage-data",
-        ),
-        FlowEnvar(
-            envar_name="DF_CONFIG_SQLALCHEMY_CREDENTIALS",
-            envar_value=f"data-flows/{CS.deployment_type}/aurora-rds",
-        ),
-    ],
     deployments=[
         FlowDeployment(
             deployment_name="backend_events_for_mozilla",
@@ -536,7 +527,7 @@ if __name__ == "__main__":
 
     t = SqlEtlJob(
         sql_folder_name="firefox_new_tab_impressions_daily/firefox_new_tab_monthly_unique_engagement_by_feed",
-        kwargs={"for_backfill": True},
+        kwargs={"for_backfill": False},
         override_last_offset="2023-08-01 23:59:59.999999",
     )  # type: ignore
     run(main(etl_input=t))  # type: ignore

@@ -1,9 +1,12 @@
 from pathlib import Path
 from typing import Optional
 
-from common.settings import NestedSettings, Settings
 from prefect.blocks.fields import SecretDict
 from prefect_gcp import BigQueryWarehouse, GcpCredentials
+
+from common.settings import CommonSettings, NestedSettings, SecretsConfig, Settings
+
+CS = CommonSettings()  # type: ignore
 
 
 class GcpCredSettings(NestedSettings):
@@ -25,16 +28,21 @@ class GcpSettings(Settings):
 
     gcp_credentials: Optional[GcpCredSettings]
 
+    class Config(SecretsConfig):
+        prefix = f"data-flows/{CS.deployment_type}"
 
-class PktGcpCredentials(GcpCredentials):
-    """Pocket GcpCrentials model with service account
-    details already set.
+SETTINGS = GcpSettings()  # type: ignore
+
+class MozGcpCredentials(GcpCredentials):
+    """Mozilla GcpCrentials model with service account
+    details already set if provided.  Application Default
+    Credentials works just as well.
 
     See https://prefecthq.github.io/prefect-gcp/ for usage.
     """
 
     def __init__(self, **data):
-        settings = GcpSettings()  # type: ignore
+        settings = SETTINGS
         if x := settings.gcp_credentials:
             if xs := x.service_account_info:
                 data["service_account_info"] = xs
@@ -43,7 +51,7 @@ class PktGcpCredentials(GcpCredentials):
         super().__init__(**data)
 
 
-class PktBigQueryWarehouse(BigQueryWarehouse):
+class MozBigQueryWarehouse(BigQueryWarehouse):
     """Pocket BigQueryWarehouse model with credentials
     already set.
 
@@ -51,5 +59,5 @@ class PktBigQueryWarehouse(BigQueryWarehouse):
     """
 
     def __init__(self, **data):
-        data["gcp_credentials"] = PktGcpCredentials()
+        data["gcp_credentials"] = MozGcpCredentials()
         super().__init__(**data)

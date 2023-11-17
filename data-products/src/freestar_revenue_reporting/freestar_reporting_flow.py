@@ -1,13 +1,12 @@
-import json
 import os
 import time
 from pathlib import Path
 
 import pandas as pd
 import requests
-from common.databases.snowflake_utils import PktSnowflakeConnector
-from common.deployment import FlowDeployment, FlowEnvar, FlowSpec
-from common.settings import CommonSettings
+from common.databases.snowflake_utils import MozSnowflakeConnector
+from common.deployment import FlowDeployment, FlowSpec
+from common.settings import CommonSettings, NestedSettings, SecretsConfig, Settings
 from prefect import flow, get_run_logger, task
 from prefect.server.schemas.schedules import CronSchedule
 from prefect_snowflake.database import snowflake_multiquery, snowflake_query_sync
@@ -19,13 +18,24 @@ output_parquet_path = "/tmp/freestar"
 output_parquet_filename = os.path.join(output_parquet_path, "data_{0}.parquet")
 
 
+class FreestarCredSettings(NestedSettings):
+    api_key: str
+
+
+class FreestarSettings(Settings):
+    freestar_credentials: FreestarCredSettings
+
+    class Config(SecretsConfig):
+        prefix = f"data-flows/{CS.deployment_type}"
+
+
 @task(retries=5, retry_delay_seconds=5)
 def extract_freestar_data():
     logger = get_run_logger()
     # Define the API base URL and endpoint
     API_BASE_URL = "https://analytics.pub.network"
     API_ENDPOINT = "/cubejs-api/v1/load"
-    FREESTAR_API_KEY = json.loads(os.environ["FREESTAR_CREDENTIALS"])["api_key"]
+    FREESTAR_API_KEY = FreestarSettings().freestar_credentials.api_key  # type: ignore
 
     # Retrieve 2,000 records at a time to accomodate 5 second timeout
     record_limit = 2000
@@ -224,27 +234,27 @@ async def freestar_report_flow():
     eft = extract_freestar_data()
     create_schema = await snowflake_query_sync(
         query=create_schema_sql,
-        snowflake_connector=PktSnowflakeConnector(),
+        snowflake_connector=MozSnowflakeConnector(),
         wait_for=[eft],
     )  # type: ignore
     create = await snowflake_query_sync(
         query=create_table_sql,
-        snowflake_connector=PktSnowflakeConnector(),
+        snowflake_connector=MozSnowflakeConnector(),
         wait_for=[create_schema],
     )  # type: ignore
     format_file = await snowflake_query_sync(
         query=format_file_sql,
-        snowflake_connector=PktSnowflakeConnector(),
+        snowflake_connector=MozSnowflakeConnector(),
         wait_for=[create],
     )  # type: ignore
     create_stage = await snowflake_query_sync(
         query=create_stage_sql,
-        snowflake_connector=PktSnowflakeConnector(),
+        snowflake_connector=MozSnowflakeConnector(),
         wait_for=[format_file],
     )  # type: ignore
     put_parquet = await snowflake_query_sync(
         query=put_parquet_sql,
-        snowflake_connector=PktSnowflakeConnector(),
+        snowflake_connector=MozSnowflakeConnector(),
         wait_for=[create_stage],
     )  # type: ignore
     await snowflake_multiquery(
@@ -255,7 +265,7 @@ async def freestar_report_flow():
             delete_sql,
             insert_sql,
         ],
-        snowflake_connector=PktSnowflakeConnector(),
+        snowflake_connector=MozSnowflakeConnector(),
         wait_for=[put_parquet],
         as_transaction=True,
     )  # type: ignore
@@ -264,16 +274,6 @@ async def freestar_report_flow():
 FLOW_SPEC = FlowSpec(
     flow=freestar_report_flow,
     docker_env="base",
-    secrets=[
-        FlowEnvar(
-            envar_name="DF_CONFIG_SNOWFLAKE_CREDENTIALS",
-            envar_value=f"data-flows/{CS.deployment_type}/snowflake-credentials",
-        ),
-        FlowEnvar(
-            envar_name="FREESTAR_CREDENTIALS",
-            envar_value=f"data-flows/{CS.deployment_type}/freestar-credentials",
-        ),
-    ],
     deployments=[
         FlowDeployment(
             deployment_name="freestar_extraction",

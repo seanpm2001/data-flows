@@ -9,15 +9,16 @@ prefect-version: "{{ $MOZILLA_PREFECT_VERSION }}"
 # pull section allows you to provide instructions for cloning this project in remote locations
 pull:
   - prefect.deployments.steps.git_clone:
+      id: git_clone
       repository: https://github.com/Pocket/data-flows.git
-      branch: '{{ MOZILLA_PREFECT_DEPLOYMENT_TYPE }}-v2'
+      branch: '{{ $MOZILLA_PREFECT_DEPLOYMENT_BRANCH }}'
   - prefect.deployments.steps.set_working_directory:
-      directory: /opt/prefect/data-flows
+      directory: '/opt/prefect/{{ git_clone.directory }}/data-products'
 
 definitions:
   work_pools:
-      cloud_run_work_pool: &cloud_run_work_pool
-          name: mozilla-cloud-run-${{ $MOZILLA_PREFECT_DEPLOYMENT_TYPE }}
+      fargate_work_pool: &fargate_work_pool
+          name: mozilla-fargate-${{ $MOZILLA_PREFECT_DEPLOYMENT_TYPE }}
           work_queue_name: default
           job_variables:
               image: "{{ $MOZILLA_PREFECT_IMAGE }}"

@@ -1,8 +1,8 @@
 from asyncio import run
 
 import pandas as pd
-from common.cloud.gcp_utils import PktGcpCredentials
-from common.databases.snowflake_utils import PktSnowflakeConnector
+from common.cloud.gcp_utils import MozGcpCredentials
+from common.databases.snowflake_utils import MozSnowflakeConnector
 from common.deployment import FlowSpec, FlowEnvar, FlowDeployment
 from common.settings import CommonSettings
 from prefect import flow
@@ -65,13 +65,13 @@ EXPORT_CORPUS_ITEM_KEYS_SQL = """
 @flow()
 async def aggregate_engagement():
     df_telemetry = await bigquery_query(
-        gcp_credentials=PktGcpCredentials(),
+        gcp_credentials=MozGcpCredentials(),
         query=EXPORT_FIREFOX_TELEMETRY_SQL,
         to_dataframe=True,
     )
 
     corpus_item_keys_records = await snowflake_query(
-        snowflake_connector=PktSnowflakeConnector(),
+        snowflake_connector=MozSnowflakeConnector(),
         query=EXPORT_CORPUS_ITEM_KEYS_SQL,
         cursor_type=DictCursor,
         params={"tile_ids": df_telemetry["TILE_ID"].tolist()},
@@ -93,20 +93,6 @@ async def aggregate_engagement():
 FLOW_SPEC = FlowSpec(
     flow=aggregate_engagement,
     docker_env="base",
-    secrets=[
-        FlowEnvar(
-            envar_name="DF_CONFIG_SNOWFLAKE_CREDENTIALS",
-            envar_value=f"data-flows/{CS.deployment_type}/snowflake-credentials",
-        ),
-        FlowEnvar(
-            envar_name="DF_CONFIG_GCP_CREDENTIALS",
-            envar_value=f"data-flows/{CS.deployment_type}/gcp-credentials",
-        ),
-        FlowEnvar(
-            envar_name="DF_CONFIG_SNOWFLAKE_GCP_STAGES",
-            envar_value=f"data-flows/{CS.deployment_type}/snowflake-gcp-stage-data",
-        ),
-    ],
     envars=[
         FlowEnvar(
             envar_name="PREFECT_API_ENABLE_HTTP2",
