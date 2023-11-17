@@ -243,7 +243,7 @@ class PrefectV2 extends TerraformStack {
       containerConfigs: [
         {
           name: `prefect-v2-worker`,
-          containerImage: `${this.caller.accountId}.dkr.ecr.${this.region.name}.amazonaws.com/data-flows-prefect-v2-envs:prefect-agent-${config.imageTag}`,
+          containerImage: 'prefecthq/prefect:2-latest',
           command: [
             "/bin/sh",
             "-c",
