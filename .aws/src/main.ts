@@ -250,6 +250,9 @@ class PrefectV2 extends TerraformStack {
         cpu: config.agentCpu,
         memory: config.agentMemory
       },
+      autoscalingConfig: {
+        targetMaxCapacity: 2
+      },
       containerConfigs: [
         {
           name: `prefect-v2-worker`,
