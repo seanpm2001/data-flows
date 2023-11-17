@@ -245,10 +245,10 @@ class PrefectV2 extends TerraformStack {
           name: `prefect-v2-worker`,
           containerImage: 'prefecthq/prefect:2-latest',
           command: [
-            "/bin/sh",
-            "-c",
+            '/bin/sh',
+            '-c',
             `pip install prefect-aws && prefect worker start --pool mozilla-aws-ecs-fargate-${deploymentType} --type ecs`
-        ],
+          ],
           secretEnvVars: [
             {
               name: 'PREFECT_API_KEY',
@@ -271,7 +271,6 @@ class PrefectV2 extends TerraformStack {
       }
     });
   }
-
 }
 
 class PrefectOidc extends TerraformStack {
