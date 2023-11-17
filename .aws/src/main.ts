@@ -244,6 +244,7 @@ class PrefectV2 extends TerraformStack {
         {
           name: `prefect-v2-worker`,
           containerImage: 'prefecthq/prefect:2-latest',
+          repositoryCredentialsParam: `arn:aws:secretsmanager:${this.region.name}:${this.caller.accountId}:secret:Shared/DockerHub`,
           command: [
             '/bin/sh',
             '-c',
